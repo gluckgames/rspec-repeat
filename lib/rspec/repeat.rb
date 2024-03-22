@@ -25,7 +25,7 @@ module RSpec
     # Much of this code is borrowed from:
     # https://github.com/NoRedInk/rspec-retry/blob/master/lib/rspec/retry.rb
     class Repeater
-      attr_accessor :count, :wait, :exceptions, :verbose, :clear_let
+      attr_accessor :count, :wait, :exceptions, :verbose, :clear_let, :on_error
 
       def initialize(count, options = {})
         options.each do |key, val|
@@ -43,12 +43,21 @@ module RSpec
 
         count.each do |i|
           example.instance_variable_set :@exception, nil
-          ex.run
+          begin
+            ex.run
+          rescue *exceptions
+            print_failure(i, example) if verbose
+            clear_memoize(ctx) if clear_let
+            sleep wait if wait.to_i > 0
+            on_error.call unless on_error.nil?
+            next
+          end
           break if example.exception.nil?
           break if !matches_exceptions?(exceptions, example.exception)
           print_failure(i, example) if verbose
           clear_memoize(ctx) if clear_let
           sleep wait if wait.to_i > 0
+          on_error.call unless on_error.nil?
         end
       end
 
